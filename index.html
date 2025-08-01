@@ -1,0 +1,511 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Planilha Médica Interativa</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .sheet-container {
+            overflow-x: auto;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
+        }
+        .sheet-cell {
+            min-width: 120px;
+            height: 40px;
+            border: 1px solid #e5e7eb;
+            padding: 6px;
+            background-color: white;
+        }
+        .sheet-cell.header {
+            background-color: #f3f4f6;
+            font-weight: 600;
+        }
+        .sheet-cell:focus {
+            outline: 2px solid #3b82f6;
+            z-index: 10;
+            position: relative;
+        }
+        .patient-report {
+            transition: all 0.3s ease;
+        }
+        .patient-report:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -1px rgba(0, 0, 0, 0.06);
+        }
+    </style>
+</head>
+<body class="bg-gray-50 font-sans">
+    <div class="container mx-auto px-4 py-8">
+        <div class="flex justify-between items-center mb-6">
+            <div>
+                <h1 class="text-2xl font-bold text-gray-800">Planilha Médica Interativa</h1>
+                <p class="text-gray-600">Sistema de fechamento mensal para pacientes</p>
+            </div>
+            <div class="flex space-x-3">
+                <button onclick="generateReports()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 2a1 1 0 011-1h6v1a1 1 0 001 1h1v6h-1a1 1 0 01-1 1H7a1 1 0 01-1-1V6z" clip-rule="evenodd" />
+                    </svg>
+                    Gerar Relatórios
+                </button>
+                <button onclick="addPatient()" class="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md flex items-center">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clip-rule="evenodd" />
+                    </svg>
+                    Novo Paciente
+                </button>
+            </div>
+        </div>
+
+        <div class="mb-6 p-4 bg-white rounded-lg shadow">
+            <h2 class="text-lg font-semibold mb-3">Filtros</h2>
+            <div class="flex flex-wrap gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Mês</label>
+                    <select id="monthFilter" class="border border-gray-300 rounded-md px-3 py-2">
+                        <option value="all">Todos</option>
+                        <option value="01">Janeiro</option>
+                        <option value="02">Fevereiro</option>
+                        <!-- outros meses -->
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                    <select id="statusFilter" class="border border-gray-300 rounded-md px-3 py-2">
+                        <option value="all">Todos</option>
+                        <option value="open">Em aberto</option>
+                        <option value="closed">Fechado</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
+                    <input type="text" id="searchInput" placeholder="Nome do paciente" class="border border-gray-300 rounded-md px-3 py-2">
+                </div>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-lg shadow mb-6 overflow-hidden">
+            <div class="sheet-container">
+                <div id="sheetGrid" class="grid" style="grid-template-columns: repeat(7, minmax(150px, 1fr));">
+                    <!-- Cabeçalhos -->
+                    <div class="sheet-cell header">ID</div>
+                    <div class="sheet-cell header">Paciente</div>
+                    <div class="sheet-cell header">Data</div>
+                    <div class="sheet-cell header">Procedimento</div>
+                    <div class="sheet-cell header">Valor</div>
+                    <div class="sheet-cell header">Status</div>
+                    <div class="sheet-cell header">Ações</div>
+                    
+                    <!-- Dados será preenchido pelo JavaScript -->
+                </div>
+            </div>
+        </div>
+
+        <div id="reportsSection" class="hidden">
+            <div class="flex justify-between items-center mb-4">
+                <h2 class="text-xl font-semibold">Relatórios Gerados</h2>
+                <button onclick="exportToDocs()" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center">
+                    <img src="https://storage.googleapis.com/workspace-0f70711f-8b4e-4d94-86f1-2a93ccde5887/image/bf29a89d-296f-4da6-8946-ad601d370e63.png" alt="Ícone do Google Docs" class="mr-2">
+                    Exportar para Google Docs
+                </button>
+            </div>
+            
+            <div id="reportsContainer" class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <!-- Relatórios serão inseridos aqui -->
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal -->
+    <div id="reportModal" class="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center hidden">
+        <div class="bg-white rounded-lg p-6 max-w-4xl w-full max-h-[90vh] overflow-auto">
+            <div class="flex justify-between items-center mb-4">
+                <h3 class="text-xl font-semibold">Relatório Mensal</h3>
+                <button onclick="closeModal()" class="text-gray-500 hover:text-gray-700">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                </button>
+            </div>
+            <div id="modalContent"></div>
+        </div>
+    </div>
+
+    <script>
+        // Dados iniciais
+        let patients = [
+            { id: 1, name: "João Silva", date: "2023-05-15", procedure: "Consulta", value: 250.00, status: "closed" },
+            { id: 2, name: "Maria Souza", date: "2023-05-18", procedure: "Exame", value: 180.00, status: "open" },
+            { id: 3, name: "Carlos Oliveira", date: "2023-05-20", procedure: "Retorno", value: 150.00, status: "open" },
+            { id: 4, name: "Ana Santos", date: "2023-06-02", procedure: "Consulta", value: 250.00, status: "closed" },
+            { id: 5, name: "Pedro Alves", date: "2023-06-10", procedure: "Cirurgia", value: 3500.00, status: "closed" }
+        ];
+
+        // Carrega a planilha
+        window.onload = function() {
+            renderSheet();
+            
+            // Configura eventos
+            document.getElementById('monthFilter').addEventListener('change', filterData);
+            document.getElementById('statusFilter').addEventListener('change', filterData);
+            document.getElementById('searchInput').addEventListener('input', filterData);
+        };
+
+        // Renderiza a planilha
+        function renderSheet(data = patients) {
+            const sheet = document.getElementById('sheetGrid');
+            // Limpa conteudo exceto cabeçalhos
+            while (sheet.children.length > 7) {
+                sheet.removeChild(sheet.lastChild);
+            }
+            
+            // Adiciona dados
+            data.forEach(patient => {
+                addRowToSheet(sheet, patient);
+            });
+        }
+
+        // Adiciona linha na planilha
+        function addRowToSheet(sheet, patient) {
+            const cellId = document.createElement('div');
+            cellId.className = 'sheet-cell';
+            cellId.textContent = patient.id;
+            sheet.appendChild(cellId);
+            
+            const cellName = document.createElement('div');
+            cellName.className = 'sheet-cell';
+            cellName.textContent = patient.name;
+            sheet.appendChild(cellName);
+            
+            const cellDate = document.createElement('div');
+            cellDate.className = 'sheet-cell';
+            cellDate.textContent = formatDate(patient.date);
+            sheet.appendChild(cellDate);
+            
+            const cellProcedure = document.createElement('div');
+            cellProcedure.className = 'sheet-cell';
+            cellProcedure.textContent = patient.procedure;
+            sheet.appendChild(cellProcedure);
+            
+            const cellValue = document.createElement('div');
+            cellValue.className = 'sheet-cell';
+            cellValue.textContent = `R$ ${patient.value.toFixed(2)}`;
+            sheet.appendChild(cellValue);
+            
+            const cellStatus = document.createElement('div');
+            cellStatus.className = 'sheet-cell';
+            const statusSpan = document.createElement('span');
+            statusSpan.className = `px-2 py-1 rounded-full text-xs ${patient.status === 'closed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}`;
+            statusSpan.textContent = patient.status === 'closed' ? 'Fechado' : 'Em aberto';
+            cellStatus.appendChild(statusSpan);
+            sheet.appendChild(cellStatus);
+            
+            const cellActions = document.createElement('div');
+            cellActions.className = 'sheet-cell flex space-x-2';
+            
+            const editBtn = document.createElement('button');
+            editBtn.className = 'text-blue-600 hover:text-blue-800';
+            editBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" /></svg>';
+            editBtn.onclick = () => editPatient(patient.id);
+            cellActions.appendChild(editBtn);
+            
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'text-red-600 hover:text-red-800';
+            deleteBtn.innerHTML = '<svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>';
+            deleteBtn.onclick = () => deletePatient(patient.id);
+            cellActions.appendChild(deleteBtn);
+            
+            sheet.appendChild(cellActions);
+        }
+
+        // Formata data
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleDateString('pt-BR');
+        }
+
+        // Filtra dados
+        function filterData() {
+            const month = document.getElementById('monthFilter').value;
+            const status = document.getElementById('statusFilter').value;
+            const search = document.getElementById('searchInput').value.toLowerCase();
+            
+            let filtered = patients.filter(patient => {
+                let match = true;
+                
+                if (month !== 'all') {
+                    const patientMonth = patient.date.split('-')[1];
+                    match = match && patientMonth === month;
+                }
+                
+                if (status !== 'all') {
+                    match = match && patient.status === status;
+                }
+                
+                if (search) {
+                    match = match && patient.name.toLowerCase().includes(search);
+                }
+                
+                return match;
+            });
+            
+            renderSheet(filtered);
+        }
+
+        // Gera relatórios
+        function generateReports() {
+            const reportsContainer = document.getElementById('reportsContainer');
+            reportsContainer.innerHTML = '';
+            
+            // Agrupa pacientes por nome
+            const patientsByName = {};
+            patients.forEach(patient => {
+                if (!patientsByName[patient.name]) {
+                    patientsByName[patient.name] = [];
+                }
+                patientsByName[patient.name].push(patient);
+            });
+            
+            // Cria relatório para cada paciente
+            for (const [name, records] of Object.entries(patientsByName)) {
+                const reportCard = document.createElement('div');
+                reportCard.className = 'patient-report bg-white rounded-lg shadow p-4';
+                
+                const total = records.reduce((sum, record) => sum + record.value, 0);
+                const closedCount = records.filter(r => r.status === 'closed').length;
+                
+                reportCard.innerHTML = `
+                    <div class="flex justify-between items-start mb-3">
+                        <h4 class="font-semibold text-lg">${name}</h4>
+                        <span class="px-2 py-1 rounded-full text-xs ${closedCount === records.length ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                            ${closedCount === records.length ? 'Fechado' : 'Pendente'}
+                        </span>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2 mb-3 text-sm">
+                        <div>
+                            <div class="text-gray-500">Procedimentos</div>
+                            <div>${records.length}</div>
+                        </div>
+                        <div>
+                            <div class="text-gray-500">Total</div>
+                            <div class="font-semibold">R$ ${total.toFixed(2)}</div>
+                        </div>
+                    </div>
+                    <div class="flex justify-between">
+                        <button onclick="viewPatientDetails('${name}')" class="text-blue-600 hover:text-blue-800 text-sm flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                <path d="M10 12a2 2 0 100-4 2 2 0 000 4z" />
+                                <path fill-rule="evenodd" d="M.458 10C1.732 5.943 5.522 3 10 3s8.268 2.943 9.542 7c-1.274 4.057-5.064 7-9.542 7S1.732 14.057.458 10zM14 10a4 4 0 11-8 0 4 4 0 018 0z" clip-rule="evenodd" />
+                            </svg>
+                            Detalhes
+                        </button>
+                        <button onclick="generatePatientReport('${name}')" class="text-green-600 hover:text-green-800 text-sm flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 mr-1" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M4 4a2 2 0 012-2h4.586A2 2 0 0112 2.586L15.414 6A2 2 0 0116 7.414V16a2 2 0 01-2 2H6a2 2 0 01-2-2V4zm2 2a1 1 0 011-1h6v1a1 1 0 001 1h1v6h-1a1 1 0 01-1 1H7a1 1 0 01-1-1V6z" clip-rule="evenodd" />
+                            </svg>
+                            Relatório
+                        </button>
+                    </div>
+                `;
+                
+                reportsContainer.appendChild(reportCard);
+            }
+            
+            document.getElementById('reportsSection').classList.remove('hidden');
+        }
+
+        // Mostra modal com detalhes do paciente
+        function viewPatientDetails(name) {
+            const patientRecords = patients.filter(p => p.name === name);
+            const modalContent = document.getElementById('modalContent');
+            
+            let html = `
+                <h4 class="font-semibold text-lg mb-4">${name} - Detalhes</h4>
+                <div class="overflow-x-auto">
+                    <table class="min-w-full divide-y divide-gray-200">
+                        <thead class="bg-gray-50">
+                            <tr>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Data</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Procedimento</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Valor</th>
+                                <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody class="bg-white divide-y divide-gray-200">
+            `;
+            
+            patientRecords.forEach(record => {
+                html += `
+                    <tr>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">${formatDate(record.date)}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">${record.procedure}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500">R$ ${record.value.toFixed(2)}</td>
+                        <td class="px-6 py-4 whitespace-nowrap text-sm">
+                            <span class="px-2 py-1 rounded-full text-xs ${record.status === 'closed' ? 'bg-green-100 text-green-800' : 'bg-yellow-100 text-yellow-800'}">
+                                ${record.status === 'closed' ? 'Fechado' : 'Em aberto'}
+                            </span>
+                        </td>
+                    </tr>
+                `;
+            });
+            
+            html += `
+                        </tbody>
+                    </table>
+                </div>
+            `;
+            
+            modalContent.innerHTML = html;
+            document.getElementById('reportModal').classList.remove('hidden');
+        }
+
+        // Gera relatório detalhado
+        function generatePatientReport(name) {
+            const patientRecords = patients.filter(p => p.name === name);
+            const total = patientRecords.reduce((sum, record) => sum + record.value, 0);
+            const closedCount = patientRecords.filter(r => r.status === 'closed').length;
+            
+            const modalContent = document.getElementById('modalContent');
+            
+            let html = `
+                <h4 class="font-semibold text-lg mb-2">${name} - Relatório Mensal</h4>
+                <div class="grid grid-cols-2 gap-4 mb-6 p-4 bg-gray-50 rounded-lg">
+                    <div>
+                        <div class="text-sm text-gray-500">Total de Procedimentos</div>
+                        <div class="text-2xl font-bold">${patientRecords.length}</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-500">Valor Total</div>
+                        <div class="text-2xl font-bold">R$ ${total.toFixed(2)}</div>
+                    </div>
+                    <div>
+                        <div class="text-sm text-gray-500">Status</div>
+                        <div class="text-lg ${closedCount === patientRecords.length ? 'text-green-600' : 'text-yellow-600'}">
+                            ${closedCount === patientRecords.length ? 'Fechado' : 'Pendente'}
+                        </div>
+                    </div>
+                </div>
+                
+                <div class="mb-4">
+                    <h5 class="font-medium mb-2">Resumo por Procedimento</h5>
+                    <div class="overflow-x-auto">
+                        <table class="min-w-full">
+                            <thead>
+                                <tr class="border-b">
+                                    <th class="text-left pb-2">Procedimento</th>
+                                    <th class="text-right pb-2">Quantidade</th>
+                                    <th class="text-right pb-2">Valor Total</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+            `;
+            
+            // Agrupa por procedimento
+            const byProcedure = {};
+            patientRecords.forEach(record => {
+                if (!byProcedure[record.procedure]) {
+                    byProcedure[record.procedure] = { count: 0, total: 0 };
+                }
+                byProcedure[record.procedure].count++;
+                byProcedure[record.procedure].total += record.value;
+            });
+            
+            // Adiciona linhas para cada procedimento
+            for (const [procedure, data] of Object.entries(byProcedure)) {
+                html += `
+                    <tr class="border-b border-gray-100">
+                        <td class="py-2">${procedure}</td>
+                        <td class="py-2 text-right">${data.count}</td>
+                        <td class="py-2 text-right">R$ ${data.total.toFixed(2)}</td>
+                    </tr>
+                `;
+            }
+            
+            html += `
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+                
+                <div class="flex justify-end mt-6">
+                    <button onclick="confirmExport('${name}')" class="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-2" viewBox="0 0 20 20" fill="currentColor">
+                            <path fill-rule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clip-rule="evenodd" />
+                        </svg>
+                        Exportar para Google Docs
+                    </button>
+                </div>
+            `;
+            
+            modalContent.innerHTML = html;
+            document.getElementById('reportModal').classList.remove('hidden');
+        }
+
+        // Confirma exportação para Google Docs
+        function confirmExport(name) {
+            alert(`Relatório de ${name} foi enviado para o Google Docs com sucesso!`);
+            closeModal();
+        }
+
+        // Exporta todos para Google Docs
+        function exportToDocs() {
+            alert('Todos os relatórios foram exportados para o Google Docs!');
+        }
+
+        // Fecha modal
+        function closeModal() {
+            document.getElementById('reportModal').classList.add('hidden');
+        }
+
+        // Adiciona novo paciente
+        function addPatient() {
+            const newId = patients.length > 0 ? Math.max(...patients.map(p => p.id)) + 1 : 1;
+            const newPatient = {
+                id: newId,
+                name: `Novo Paciente ${newId}`,
+                date: new Date().toISOString().split('T')[0],
+                procedure: 'Consulta',
+                value: 200.00,
+                status: 'open'
+            };
+            
+            patients.push(newPatient);
+            renderSheet();
+            
+            // Simula edição da célula
+            const cells = document.querySelectorAll('.sheet-cell');
+            const newRowStartIndex = (patients.length - 1) * 7 + 7;
+            setTimeout(() => {
+                cells[newRowStartIndex].focus();
+            }, 100);
+        }
+
+        // Edita paciente
+        function editPatient(id) {
+            const patient = patients.find(p => p.id === id);
+            if (!patient) return;
+            
+            const newName = prompt('Nome do paciente:', patient.name);
+            if (newName !== null) patient.name = newName;
+            
+            const newProcedure = prompt('Procedimento:', patient.procedure);
+            if (newProcedure !== null) patient.procedure = newProcedure;
+            
+            const newValue = prompt('Valor:', patient.value);
+            if (newValue !== null && !isNaN(newValue)) patient.value = parseFloat(newValue);
+            
+            renderSheet();
+        }
+
+        // Remove paciente
+        function deletePatient(id) {
+            if (confirm('Tem certeza que deseja remover este paciente?')) {
+                patients = patients.filter(p => p.id !== id);
+                renderSheet();
+            }
+        }
+    </script>
+</body>
+</html>
+
